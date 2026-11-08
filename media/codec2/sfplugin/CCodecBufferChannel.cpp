@@ -100,6 +100,10 @@ constexpr uint32_t kSourceMemoryMapSize = 16;
 // This is for keeping IGBP's buffer dropping logic in legacy mode other
 // than making it non-blocking. Do not change this value.
 const static size_t kDequeueTimeoutNs = 0;
+// If app goes into background, decoding paused. we have WA logic in HAL to sleep some actions.
+// This value is to monitor if decoding is paused then we can signal a new empty work to HAL
+// after app resume to foreground to notify HAL something
+const static uint64_t kPipelinePausedTimeoutMs = 500;
 
 // QTI_BEGIN: 2021-03-29: Video: [WA] Codec2: queue a empty work to HAL to wake up allocation thread
 // If app goes into background, decoding paused. we have WA logic in HAL to sleep some actions.
@@ -460,7 +464,7 @@ void CCodecBufferChannel::setComponent(
     mComponentName = component->getName() + StringPrintf("#%d", int(uintptr_t(component.get()) % 997));
     mName = mComponentName.c_str();
 // QTI_BEGIN: 2022-04-26: Video: CCodec: Use pipelineRoom only for HW decoder
-    std::regex pattern{"c2\\.qti\\..*\\.decoder.*"};
+    std::regex pattern{"c2\\.(mtk|qti)\\..*\\.decoder.*"};
     mIsHWDecoder = std::regex_match(mComponentName, pattern);
 // QTI_END: 2022-04-26: Video: CCodec: Use pipelineRoom only for HW decoder
 }
@@ -2294,7 +2298,12 @@ status_t CCodecBufferChannel::start(
         if (!buffersBoundToCodec) {
             inputFormat->setInt32(KEY_NUM_SLOTS, numInputSlots);
         }
-        bool conforming = (apiFeatures & API_SAME_INPUT_BUFFER);
+        // For sessions where buffers are not bound to CCodec (e.g., thumbnail /
+        // no-surface decode), the API_SAME_INPUT_BUFFER behaviour (SlotInputBuffers)
+        // is incompatible with the single-frame decode pattern. Even if the codec
+        // advertises this capability, treat such sessions as non-conforming so that
+        // the normal (non-slot) input buffer path is used.
+        bool conforming = buffersBoundToCodec && (apiFeatures & API_SAME_INPUT_BUFFER);
         // For encrypted content, framework decrypts source buffer (ashmem) into
         // C2Buffers. Thus non-conforming codecs can process these.
         // For graphic buffer, framework uses graphic buffers directly.

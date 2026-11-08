@@ -50,6 +50,7 @@
 #include <cutils/properties.h>
 // QTI_END: 2018-06-05: Video: media: Add changes to pick target specific media xml's
 #include <vector>
+#include <cutils/properties.h>
 
 namespace android {
 

@@ -1177,6 +1177,8 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
         output.portId = portId;
 
         if (lStatus == NO_ERROR) {
+            mAppVolumeHelper.applyToTrack(track);
+
             // no risk of deadlock because AudioFlinger::mutex() is held
             audio_utils::lock_guard _dl(thread->mutex());
             // Connect secondary outputs. Failure on a secondary output must not imped the primary
@@ -2036,6 +2038,24 @@ uint32_t AudioFlinger::getInputFramesLost(audio_io_handle_t ioHandle) const
         return recordThread->getInputFramesLost();
     }
     return 0;
+}
+
+status_t AudioFlinger::listAppVolumes(std::vector<media::AppVolume> *vols)
+{
+    audio_utils::lock_guard _l(mutex());
+    return mAppVolumeHelper.listVolumes(vols, mPlaybackThreads);
+}
+
+status_t AudioFlinger::setAppVolume(const String8& packageName, const float value)
+{
+    audio_utils::lock_guard _l(mutex());
+    return mAppVolumeHelper.setVolume(packageName, value, mPlaybackThreads);
+}
+
+status_t AudioFlinger::setAppMute(const String8& packageName, const bool value)
+{
+    audio_utils::lock_guard _l(mutex());
+    return mAppVolumeHelper.setMute(packageName, value, mPlaybackThreads);
 }
 
 status_t AudioFlinger::setVoiceVolume(float value)

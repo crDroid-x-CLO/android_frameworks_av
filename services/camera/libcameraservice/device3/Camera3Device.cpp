@@ -547,6 +547,7 @@ ssize_t Camera3Device::getJpegBufferSize(const CameraMetadata &info, uint32_t wi
 
     ssize_t minJpegBufferSize = kMinJpegBufferSize + jpegDebugSize;
     // Calculate final jpeg buffer size for the given resolution.
+    ssize_t minJpegBufferSize = kMinJpegBufferSize + jpegDebugSize;
     float scaleFactor = ((float) (width * height)) /
             (chosenMaxJpegResolution.width * chosenMaxJpegResolution.height);
     ssize_t jpegBufferSize = scaleFactor * (maxJpegBufferSize - minJpegBufferSize) +
@@ -2632,6 +2633,27 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         CLOGE("Invalid operating mode: %d", operatingMode);
         return BAD_VALUE;
     }
+
+#ifdef CAMERA_PACKAGE_NAME
+    sp<VendorTagDescriptor> vTags;
+    sp<VendorTagDescriptorCache> vCache = VendorTagDescriptorCache::getGlobalVendorTagCache();
+    if (vCache.get()) {
+        const camera_metadata_t *metaBuffer = sessionParams.getAndLock();
+        metadata_vendor_id_t vendorId = get_camera_metadata_vendor_id(metaBuffer);
+        sessionParams.unlock(metaBuffer);
+        vCache->getVendorTagDescriptor(vendorId, &vTags);
+        uint32_t tag;
+        if (CameraMetadata::getTagFromName(CAMERA_PACKAGE_NAME, vTags.get(), &tag)) {
+            ALOGE("%s: Unable to get %s tag", __FUNCTION__, CAMERA_PACKAGE_NAME);
+        } else {
+            std::string pkgName = CameraService::getCurrPackageName();
+            status_t res = const_cast<CameraMetadata&>(sessionParams).update(tag, String8(pkgName.c_str()));
+            if (res) {
+                ALOGE("%s: metadata update failed, res = %d", __FUNCTION__, res);
+            }
+        }
+    }
+#endif
 
     bool isConstrainedHighSpeed =
             CAMERA_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE == operatingMode;

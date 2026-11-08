@@ -23,11 +23,13 @@ filegroup {
     srcs: [
         "ActivityManager.cpp",
         "DeathNotifier.cpp",
+        "HDCP.cpp",
         "MediaPlayerFactory.cpp",
         "MediaPlayerService.cpp",
         "MediaRecorderClient.cpp",
         "MetadataRetrieverClient.cpp",
         "StagefrightMetadataRetriever.cpp",
+        "RemoteDisplay.cpp",
         "StagefrightRecorder.cpp",
         "TestPlayerStub.cpp",
 // QTI_BEGIN: 2023-06-21: Video: libmediaplayerservice: Enable perfboost during heif decode
@@ -79,6 +81,7 @@ cc_defaults {
         "libnetd_client",
         "libpowermanager",
         "libstagefright",
+        "libstagefright_wfd",
         "libstagefright_foundation",
         "libstagefright_httplive",
 // QTI_BEGIN: 2018-01-23: Audio: stagefright: Make classes customizable and add AV extensions
@@ -142,6 +145,7 @@ cc_library {
         "frameworks/av/media/libmediaextractor",
 // QTI_END: 2018-01-23: Audio: stagefright: Make classes customizable and add AV extensions
         "frameworks/av/media/module/mpeg2ts",
+        "frameworks/av/media/libstagefright/wifi-display",
     ],
 
     export_include_dirs: [

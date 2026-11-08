@@ -171,6 +171,9 @@ status_t EffectBase::setEnabled(bool enabled, bool fromHandle)
             getCallback()->onEffectDisable(this);
         }
     }
+    if (status != NO_ERROR) {
+        status = updatePolicyState();
+    }
     return status;
 }
 
@@ -1913,12 +1916,6 @@ Status EffectHandle::enable(int32_t* _aidl_return)
 
     mEnabled = true;
 
-    status_t status = effect->updatePolicyState();
-    if (status != NO_ERROR) {
-        mEnabled = false;
-        RETURN(status);
-    }
-
     effect->checkSuspendOnEffectEnabled(true, false /*threadLocked*/);
 
     // checkSuspendOnEffectEnabled() can suspend this same effect when enabled
@@ -1926,7 +1923,7 @@ Status EffectHandle::enable(int32_t* _aidl_return)
         RETURN(NO_ERROR);
     }
 
-    status = effect->setEnabled(true, true /*fromHandle*/);
+    status_t status = effect->setEnabled(true, true /*fromHandle*/);
     if (status != NO_ERROR) {
         mEnabled = false;
     }
@@ -1949,8 +1946,6 @@ Status EffectHandle::disable(int32_t* _aidl_return)
         RETURN(NO_ERROR);
     }
     mEnabled = false;
-
-    effect->updatePolicyState();
 
     if (effect->suspended()) {
         RETURN(NO_ERROR);
@@ -2978,6 +2973,21 @@ static const effect_uuid_t SL_IID_DAP_ = { 0x46d279d9, 0x9be7, 0x453d, 0x9d7c,
                                          { 0xef, 0x93, 0x7f, 0x67, 0x55, 0x87 } };
 const effect_uuid_t * const SL_IID_DAP = &SL_IID_DAP_;
 
+// Dolby Atmos SW
+static const effect_uuid_t SL_IID_DAP_SW_ = // 9d4921da-8225-4f29-aefa-39537a04bcaa
+{ 0x9d4921da, 0x8225, 0x4f29, 0xaefa, {0x39, 0x53, 0x7a, 0x04, 0xbc, 0xaa} };
+const effect_uuid_t * const SL_IID_DAP_SW = &SL_IID_DAP_SW_;
+
+// Dolby Atmos offload (type fa81dbde-588b-11ed-9b6a-0242ac120002)
+static const effect_uuid_t SL_IID_DAP_OFFLOAD_ =
+{ 0xfa81dbde, 0x588b, 0x11ed, 0x9b6a, {0x02, 0x42, 0xac, 0x12, 0x00, 0x02} };
+const effect_uuid_t * const SL_IID_DAP_OFFLOAD = &SL_IID_DAP_OFFLOAD_;
+
+// ViperFx
+static const effect_uuid_t SL_V4A_RE_ = // 90380da3-8536-4744-a6a3-5731970e640f
+{ 0x90380da3, 0x8536, 0x4744, 0xa6a3, {0x57, 0x31, 0x97, 0x0e, 0x64, 0x0f} };
+const effect_uuid_t * const SL_V4A_RE = &SL_V4A_RE_;
+
 /* static */
 bool EffectChain::isEffectEligibleForBtNrecSuspend_l(const effect_uuid_t* type) {
     // Only NS and AEC are suspended when BtNRec is off
@@ -2998,6 +3008,9 @@ bool EffectChain::isEffectEligibleForSuspend(const effect_descriptor_t& desc)
           (memcmp(&desc.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) ||
           (memcmp(&desc.type, SL_IID_VOLUME, sizeof(effect_uuid_t)) == 0) ||
           (memcmp(&desc.type, SL_IID_DAP, sizeof(effect_uuid_t)) == 0) ||
+          (memcmp(&desc.type, SL_IID_DAP_SW, sizeof(effect_uuid_t)) == 0) ||
+          (memcmp(&desc.type, SL_IID_DAP_OFFLOAD, sizeof(effect_uuid_t)) == 0) ||
+          (memcmp(&desc.type, SL_V4A_RE, sizeof(effect_uuid_t)) == 0) ||
           (memcmp(&desc.type, SL_IID_DYNAMICSPROCESSING, sizeof(effect_uuid_t)) == 0)))) {
         return false;
     }

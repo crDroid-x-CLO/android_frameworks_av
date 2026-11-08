@@ -24,6 +24,8 @@
 #endif
 //#define LOG_NDEBUG 0
 
+#include <android-base/properties.h>
+#include <android-base/strings.h>
 #include <android/content/res/CameraCompatibilityInfo.h>
 #include <android-base/strings.h>
 #include <camera/CameraUtils.h>
@@ -222,6 +224,7 @@ status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr,
             strerror(-res), res);
         return res;
     }
+    mDevice->setPrivilegedClient(mPrivilegedClient);
     return OK;
 }
 

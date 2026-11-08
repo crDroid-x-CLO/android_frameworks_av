@@ -38,6 +38,7 @@
 #include <aidl/AidlCameraService.h>
 #include <android-base/macros.h>
 #include <android-base/parseint.h>
+#include <android-base/properties.h>
 #include <android-base/strings.h>
 #include <android/companion/virtualnative/IVirtualDeviceManagerNative.h>
 #include <binder/ActivityManager.h>
@@ -90,6 +91,14 @@
 #include "utils/TagMonitor.h"
 #include "utils/Utils.h"
 
+#ifdef CAMERA_NEEDS_CLIENT_INFO_LIB
+#include <vendor/oneplus/hardware/camera/1.0/IOnePlusCameraProvider.h>
+#endif
+
+#ifdef CAMERA_NEEDS_CLIENT_INFO_LIB_OPLUS
+#include <vendor/oplus/hardware/cameraMDM/2.0/IOPlusCameraMDM.h>
+#endif
+
 namespace {
     const char* kActivityServiceName = "activity";
     const char* kSensorPrivacyServiceName = "sensor_privacy";
@@ -139,6 +148,12 @@ using hardware::camera2::ICameraInjectionSession;
 using hardware::camera2::ICameraDeviceUser;
 using hardware::camera2::utils::CameraIdAndSessionConfiguration;
 using hardware::camera2::utils::ConcurrentCameraIdCombination;
+#ifdef CAMERA_NEEDS_CLIENT_INFO_LIB
+using ::vendor::oneplus::hardware::camera::V1_0::IOnePlusCameraProvider;
+#endif
+#ifdef CAMERA_NEEDS_CLIENT_INFO_LIB_OPLUS
+using ::vendor::oplus::hardware::cameraMDM::V2_0::IOPlusCameraMDM;
+#endif
 
 namespace flags = com::android::internal::camera::flags;
 namespace lights_flags = com::android::server::lights::feature::flags;
@@ -174,6 +189,12 @@ static const std::string &sCameraInjectExternalCameraPermission =
 // Constant integer for FGS Logging, used to denote the API type for logger
 static const int LOG_FGS_CAMERA_API = 1;
 const char *sFileName = "lastOpenSessionDumpFile";
+#ifdef CAMERA_NEEDS_CLIENT_INFO_LIB
+static const sp<IOnePlusCameraProvider> gVendorCameraProviderService = IOnePlusCameraProvider::getService();
+#endif
+#ifdef CAMERA_NEEDS_CLIENT_INFO_LIB_OPLUS
+static const sp<IOPlusCameraMDM> gVendorCameraProviderService = IOPlusCameraMDM::getService();
+#endif
 static constexpr int32_t kSystemNativeClientScore = resource_policy::PERCEPTIBLE_APP_ADJ;
 static constexpr int32_t kSystemNativeClientState =
         ActivityManager::PROCESS_STATE_PERSISTENT_UI;
@@ -186,6 +207,9 @@ constexpr int32_t kInvalidDeviceId = -1;
 
 // Set to keep track of logged service error events.
 static std::set<std::string> sServiceErrorEventSet;
+
+// Current camera package name
+static std::string sCurrPackageName;
 
 CameraService::CameraService(
         std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
@@ -1559,6 +1583,10 @@ Status CameraService::filterGetInfoErrorCode(status_t err) {
     }
 }
 
+std::string CameraService::getCurrPackageName() {
+    return sCurrPackageName;
+}
+
 Status CameraService::makeClient(
         const sp<CameraService>& cameraService, const sp<IInterface>& cameraCb,
         const AttributionSourceState& clientAttribution, int callingPid, bool systemNativeClient,
@@ -1969,6 +1997,18 @@ status_t CameraService::checkIfDeviceIsUsable(const std::string& cameraId) const
     return NO_ERROR;
 }
 
+bool isPrivilegedClient(const std::string &packageName) {
+    // x-CLO camera apps that are always privileged
+    if (packageName == "com.android.camera" || packageName == "com.google.android.GoogleCamera") {
+        return true;
+    }
+    std::vector<std::string> privilegedClientList = android::base::Split(
+            android::base::GetProperty("persist.vendor.camera.privapp.list", ""), ",");
+    auto it = std::find(privilegedClientList.begin(), privilegedClientList.end(),
+            packageName);
+    return it != privilegedClientList.end();
+}
+
 void CameraService::finishConnectLocked(const sp<BasicClient>& client,
         const CameraService::DescriptorPtr& desc, int oomScoreOffset, bool systemNativeClient) {
 
@@ -1978,13 +2018,9 @@ void CameraService::finishConnectLocked(const sp<BasicClient>& client,
                     oomScoreOffset, systemNativeClient);
     auto evicted = mActiveClientManager.addAndEvict(clientDescriptor);
 
-    const char* packageName = toString8(client->getPackageName()).c_str();
-
-    if (strcmp(packageName, "com.android.camera") == 0
-        || strcmp(packageName, "com.google.android.GoogleCamera") == 0) {
+    if (isPrivilegedClient(client->getPackageName())) {
         evicted.clear();
     }
-
 
     logConnected(desc->getKey(), static_cast<int>(desc->getOwnerId()),
             client->getPackageName());
@@ -2131,10 +2167,7 @@ status_t CameraService::handleEvictionsLocked(const std::string& cameraId, int c
         // Find clients that would be evicted
         auto evicted = mActiveClientManager.wouldEvict(clientDescriptor);
 
-        const char* packageNameStr = toString8(packageName).c_str();
-
-        if (strcmp(packageNameStr, "com.android.camera") == 0
-            || strcmp(packageNameStr, "com.google.android.GoogleCamera") == 0) {
+        if (isPrivilegedClient(packageName)) {
             evicted.clear();
         }
 
@@ -2593,6 +2626,8 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const std::str
 
     const std::string clientPackageName =
             clientAttribution.packageName.value_or(kUnknownPackageName);
+
+    sCurrPackageName = clientPackageName;
 
     {
         // Acquire mServiceLock and prevent other clients from connecting
@@ -3063,11 +3098,15 @@ Status CameraService::turnOnTorchWithStrengthLevel(const std::string& unresolved
         Mutex::Autolock al(mTorchUidMapMutex);
         updateTorchUidMapLocked(cameraId, uid);
     }
+#ifdef DISABLE_TORCH_CONTROL
+    bool shouldSkipTorchStrengthUpdates = false;
+    status_t err = mFlashlight->setTorchMode(cameraId, (torchStrength > 0) ? 1 : 0);
+#else
     // Check if the current torch strength level is same as the new one.
     bool shouldSkipTorchStrengthUpdates = mCameraProviderManager->shouldSkipTorchStrengthUpdate(
             cameraId, torchStrength);
-
     status_t err = mFlashlight->turnOnTorchWithStrengthLevel(cameraId, torchStrength);
+#endif
 
     if (err != OK) {
         int32_t errorCode;
@@ -4533,6 +4572,10 @@ status_t CameraService::BasicClient::notifyCameraOpening() {
     // Notify listeners of camera open/close status
     sCameraService->updateOpenCloseStatus(mCameraIdStr, true /*open*/, getPackageName(),
             mSharedMode);
+
+#if defined (CAMERA_NEEDS_CLIENT_INFO_LIB) || defined (CAMERA_NEEDS_CLIENT_INFO_LIB_OPLUS)
+    gVendorCameraProviderService->setPackageName(getPackageName().c_str());
+#endif
 
     return OK;
 }

@@ -1172,7 +1172,8 @@ MediaProfiles::getInstance()
                         if (property_get("vendor.media.target.version", value, "0") &&
 // QTI_END: 2019-11-04: Video: MediaProfiles: rename the device name with target
 // QTI_BEGIN: 2018-08-13: Video: media: Add changes to pick target specific media xml's
-                            (atoi(value) == 1)){
+                            (atoi(value) == 1) &&
+                            checkXmlFile("/vendor/etc/media_profiles_8953_v1.xml")){
                             strlcpy(value, "/vendor/etc/media_profiles_8953_v1.xml",
                                     PROPERTY_VALUE_MAX);
                         } else {
@@ -1187,7 +1188,8 @@ MediaProfiles::getInstance()
                         property_get("vendor.media.target.version", value, "0");
 // QTI_END: 2019-11-04: Video: MediaProfiles: rename the device name with target
 // QTI_BEGIN: 2018-09-25: Video: media: Changes to pick target specific media xml
-                        if (atoi(value) == 1) {
+                        if (atoi(value) == 1 &&
+                                checkXmlFile("/vendor/etc/media_profiles_sdm660_v1.xml")) {
                             strlcpy(value, "/vendor/etc/media_profiles_sdm660_v1.xml",
                                     PROPERTY_VALUE_MAX);
                         } else {
@@ -1202,10 +1204,12 @@ MediaProfiles::getInstance()
                         property_get("vendor.sys.media.target.version", value, "0");
 // QTI_END: 2020-05-26: Video: media: extend added support to pick target specific xml
 // QTI_BEGIN: 2021-04-23: Video: media: add support to pick target specific xml
-                        if (atoi(value) == 3) {
+                        if (atoi(value) == 3 &&
+                                checkXmlFile("/vendor/etc/media_profiles_khaje.xml")) {
                             strlcpy(value, "/vendor/etc/media_profiles_khaje.xml",
                                     PROPERTY_VALUE_MAX);
-                        } else if (atoi(value) == 2) {
+                        } else if (atoi(value) == 2 &&
+                                checkXmlFile("/vendor/etc/media_profiles_scuba.xml")) {
 // QTI_END: 2021-04-23: Video: media: add support to pick target specific xml
 // QTI_BEGIN: 2020-04-02: Video: media: add support to pick target specific xml
                             strlcpy(value, "/vendor/etc/media_profiles_scuba.xml",
@@ -1223,8 +1227,10 @@ MediaProfiles::getInstance()
                     if (property_get("ro.media.xml_variant.codecs", variant, NULL) > 0) {
                         std::string xmlPath = std::string("/vendor/etc/media_profiles") +
                                               std::string(variant) + std::string(".xml");
-                        strlcpy(value, xmlPath.c_str(), PROPERTY_VALUE_MAX);
-                        ALOGI("Profiles xml path: %s", value);
+                        if (checkXmlFile(xmlPath.c_str())) {
+                            strlcpy(value, xmlPath.c_str(), PROPERTY_VALUE_MAX);
+                            ALOGI("Profiles xml path: %s", value);
+                        }
 // QTI_END: 2020-08-04: Video: media: add support to pick profiles xml based on target variant
 // QTI_BEGIN: 2023-11-22: Core: libmedia: Add support for media profiles override
                         //Checking if QSPA is enabled

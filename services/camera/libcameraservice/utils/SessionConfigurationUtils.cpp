@@ -244,7 +244,7 @@ bool roundBufferDimensionNearest(int32_t width, int32_t height,
     // requirement. AIDE2 is vendor enhanced feature which requires special resolutions and
     // those are not populated in static capabilities.
     if (isPriviledgedClient == true &&
-        (format == HAL_PIXEL_FORMAT_YCbCr_420_888 || format == HAL_PIXEL_FORMAT_BLOB || format == HAL_PIXEL_FORMAT_Y8)) {
+        (format == HAL_PIXEL_FORMAT_YCbCr_420_888 || format == HAL_PIXEL_FORMAT_BLOB || format == HAL_PIXEL_FORMAT_Y8 || format == HAL_PIXEL_FORMAT_Y16)) {
         ALOGI("Bypass roundBufferDimensionNearest for privilegedClient YUV streams "
               "width %d height %d for format %d",
               width, height, format);
@@ -861,7 +861,7 @@ binder::Status convertToHALStreamCombination(
         metadataGetter getMetadata, const std::vector<std::string>& physicalCameraIds,
         aidl::android::hardware::camera::device::StreamConfiguration& streamConfiguration,
         bool overrideForPerfClass, metadata_vendor_id_t vendorTagId, bool checkSessionParams,
-        const std::vector<int32_t>& additionalKeys, bool* earlyExit) {
+        const std::vector<int32_t>& additionalKeys, bool* earlyExit, bool isPriviledgedClient) {
     using SensorPixelMode = aidl::android::hardware::camera::metadata::SensorPixelMode;
     auto operatingMode = sessionConfiguration.getOperatingMode();
     binder::Status res = checkOperatingMode(operatingMode, deviceInfo,
@@ -1027,7 +1027,7 @@ binder::Status convertToHALStreamCombination(
                                     logicalCameraId,  deviceInfo, metadataChosen,
                                     sensorPixelModesUsed, dynamicRangeProfile, streamUseCase,
                                     timestampBase, mirrorMode, colorSpace,
-                                    /*respectSurfaceSize*/ true, multiResMode);
+                                    /*respectSurfaceSize*/ true, multiResMode, isPriviledgedClient);
 
             if (!res.isOk()) return res;
 
