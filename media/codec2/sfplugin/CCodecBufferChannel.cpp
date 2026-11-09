@@ -100,10 +100,6 @@ constexpr uint32_t kSourceMemoryMapSize = 16;
 // This is for keeping IGBP's buffer dropping logic in legacy mode other
 // than making it non-blocking. Do not change this value.
 const static size_t kDequeueTimeoutNs = 0;
-// If app goes into background, decoding paused. we have WA logic in HAL to sleep some actions.
-// This value is to monitor if decoding is paused then we can signal a new empty work to HAL
-// after app resume to foreground to notify HAL something
-const static uint64_t kPipelinePausedTimeoutMs = 500;
 
 // QTI_BEGIN: 2021-03-29: Video: [WA] Codec2: queue a empty work to HAL to wake up allocation thread
 // If app goes into background, decoding paused. we have WA logic in HAL to sleep some actions.
